@@ -95,8 +95,28 @@ class Project(Document):
 		self.send_welcome_email()
 		self.update_costing()
 		self.update_percent_complete()
+		self.validate_retention()
+		self.validate_advance_recovery()
 		self.validate_from_to_dates("expected_start_date", "expected_end_date")
 		self.validate_from_to_dates("actual_start_date", "actual_end_date")
+
+	def validate_retention(self):
+		if not self.get("enable_retention"):
+			self.retention_percentage = 0
+			self.retention_release_date = None
+			self.retention_release_after_days = 0
+			return
+
+		if flt(self.retention_percentage) <= 0 or flt(self.retention_percentage) >= 100:
+			frappe.throw(_("Retention % must be greater than 0 and less than 100"))
+
+	def validate_advance_recovery(self):
+		if not self.get("enable_advance_recovery"):
+			self.advance_recovery_percentage = 0
+			return
+
+		if flt(self.advance_recovery_percentage) <= 0 or flt(self.advance_recovery_percentage) > 100:
+			frappe.throw(_("Advance Recovery % must be greater than 0 and less than or equal to 100"))
 
 	def copy_from_template(self, trigger=None):
 		"""

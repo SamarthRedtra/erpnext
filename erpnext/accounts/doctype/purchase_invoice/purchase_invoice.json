@@ -105,6 +105,17 @@
   "total_advance",
   "column_break_peap",
   "outstanding_amount",
+  "retention_section",
+  "enable_retention",
+  "retention_percentage",
+  "retention_amount",
+  "base_retention_amount",
+  "column_break_retention",
+  "net_payable_amount",
+  "retention_released_amount",
+  "retention_outstanding_amount",
+  "retention_release_date",
+  "retention_account",
   "section_tax_withholding_entry",
   "tax_withholding_group",
   "ignore_tax_withholding_threshold",
@@ -132,6 +143,9 @@
   "cash_bank_account",
   "paid_amount",
   "advances_section",
+  "enable_advance_recovery",
+  "advance_recovery_percentage",
+  "advance_recovery_amount",
   "allocate_advances_automatically",
   "only_include_allocated_payments",
   "get_advances",
@@ -1001,6 +1015,81 @@
    "read_only": 1
   },
   {
+   "collapsible": 1,
+   "fieldname": "retention_section",
+   "fieldtype": "Section Break",
+   "label": "Retention"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_retention",
+   "fieldtype": "Check",
+   "label": "Enable Retention"
+  },
+  {
+   "depends_on": "enable_retention",
+   "fieldname": "retention_percentage",
+   "fieldtype": "Percent",
+   "label": "Retention %"
+  },
+  {
+   "depends_on": "enable_retention",
+   "fieldname": "retention_amount",
+   "fieldtype": "Currency",
+   "label": "Retention Amount",
+   "options": "party_account_currency",
+   "read_only": 1
+  },
+  {
+   "depends_on": "enable_retention",
+   "fieldname": "base_retention_amount",
+   "fieldtype": "Currency",
+   "label": "Retention Amount (Company Currency)",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_retention",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "enable_retention",
+   "fieldname": "net_payable_amount",
+   "fieldtype": "Currency",
+   "label": "Net Payable Amount",
+   "options": "party_account_currency",
+   "read_only": 1
+  },
+  {
+   "depends_on": "enable_retention",
+   "fieldname": "retention_released_amount",
+   "fieldtype": "Currency",
+   "label": "Retention Released Amount",
+   "options": "party_account_currency",
+   "read_only": 1
+  },
+  {
+   "depends_on": "enable_retention",
+   "fieldname": "retention_outstanding_amount",
+   "fieldtype": "Currency",
+   "label": "Retention Outstanding Amount",
+   "options": "party_account_currency",
+   "read_only": 1
+  },
+  {
+   "depends_on": "enable_retention",
+   "fieldname": "retention_release_date",
+   "fieldtype": "Date",
+   "label": "Retention Release Date"
+  },
+  {
+   "depends_on": "enable_retention",
+   "fieldname": "retention_account",
+   "fieldtype": "Link",
+   "label": "Retention Payable Account",
+   "options": "Account"
+  },
+  {
    "default": "0",
    "depends_on": "grand_total",
    "fieldname": "disable_rounded_total",
@@ -1112,6 +1201,26 @@
    "oldfieldtype": "Section Break",
    "options": "fa fa-money",
    "print_hide": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_advance_recovery",
+   "fieldtype": "Check",
+   "label": "Enable Advance Recovery"
+  },
+  {
+   "depends_on": "enable_advance_recovery",
+   "fieldname": "advance_recovery_percentage",
+   "fieldtype": "Percent",
+   "label": "Advance Recovery %"
+  },
+  {
+   "depends_on": "enable_advance_recovery",
+   "fieldname": "advance_recovery_amount",
+   "fieldtype": "Currency",
+   "label": "Advance Recovery Amount",
+   "options": "party_account_currency",
+   "read_only": 1
   },
   {
    "default": "0",

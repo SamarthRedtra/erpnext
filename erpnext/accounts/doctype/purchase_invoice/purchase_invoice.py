@@ -12,6 +12,7 @@ from frappe.query_builder.functions import Sum
 from frappe.utils import cint, cstr, flt, formatdate, get_link_to_form, getdate, nowdate
 
 import erpnext
+from erpnext.accounts.advance_recovery import validate_advance_recovery
 from erpnext.accounts.deferred_revenue import validate_service_stop_date
 from erpnext.accounts.doctype.repost_accounting_ledger.repost_accounting_ledger import (
 	validate_docs_for_deferred_accounting,
@@ -33,6 +34,8 @@ from erpnext.accounts.general_ledger import (
 	merge_similar_entries,
 )
 from erpnext.accounts.party import get_due_date, get_party_account
+from erpnext.accounts.progressive_billing import set_progressive_billing_values
+from erpnext.accounts.retention import append_retention_gl_entry, calculate_retention, validate_retention
 from erpnext.accounts.utils import get_account_currency, get_fiscal_year, update_voucher_outstanding
 from erpnext.assets.doctype.asset.asset import is_cwip_accounting_enabled
 from erpnext.assets.doctype.asset_category.asset_category import get_asset_category_account
@@ -265,6 +268,8 @@ class PurchaseInvoice(BuyingController):
 		self.validate_posting_date_with_po()
 
 		super().validate()
+		validate_advance_recovery(self)
+		validate_retention(self)
 
 		if not self.is_return:
 			self.po_required()
@@ -289,8 +294,10 @@ class PurchaseInvoice(BuyingController):
 		self.set_expense_account(for_validate=True)
 		self.validate_expense_account()
 		self.set_against_expense_account()
+		validate_retention(self)
 		self.validate_write_off_account()
 		self.validate_multiple_billing("Purchase Receipt", "pr_detail", "amount")
+		set_progressive_billing_values(self)
 		self.set_status()
 		self.validate_purchase_receipt_if_update_stock()
 		validate_inter_company_party(
@@ -358,6 +365,8 @@ class PurchaseInvoice(BuyingController):
 					self.apply_tds = 1
 
 		super().set_missing_values(for_validate)
+		validate_advance_recovery(self)
+		calculate_retention(self)
 
 	def validate_credit_to_acc(self):
 		if not self.credit_to:
@@ -867,6 +876,7 @@ class PurchaseInvoice(BuyingController):
 		gl_entries = []
 
 		self.make_supplier_gl_entry(gl_entries)
+		append_retention_gl_entry(self, gl_entries)
 		self.make_item_gl_entries(gl_entries)
 		self.make_precision_loss_gl_entry(gl_entries)
 
@@ -906,6 +916,12 @@ class PurchaseInvoice(BuyingController):
 			else self.base_grand_total,
 			self.precision("base_grand_total"),
 		)
+		if self.get("enable_retention"):
+			grand_total = flt(grand_total - flt(self.retention_amount), self.precision("grand_total"))
+			base_grand_total = flt(
+				base_grand_total - flt(self.base_retention_amount),
+				self.precision("base_grand_total"),
+			)
 
 		if grand_total and not self.is_internal_transfer():
 			self.add_supplier_gl_entry(gl_entries, base_grand_total, grand_total)

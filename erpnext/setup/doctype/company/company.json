@@ -53,6 +53,8 @@
   "default_cash_account",
   "default_receivable_account",
   "default_payable_account",
+  "default_retention_receivable_account",
+  "default_retention_payable_account",
   "write_off_account",
   "unrealized_profit_loss_account",
   "column_break0",
@@ -402,6 +404,22 @@
    "no_copy": 1,
    "oldfieldname": "payables_group",
    "oldfieldtype": "Link",
+   "options": "Account"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "default_retention_receivable_account",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Default Retention Receivable Account",
+   "options": "Account"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "default_retention_payable_account",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Default Retention Payable Account",
    "options": "Account"
   },
   {

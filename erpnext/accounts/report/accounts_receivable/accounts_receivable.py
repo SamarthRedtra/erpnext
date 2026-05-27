@@ -470,9 +470,19 @@ class ReceivablePayableReport:
 					"company": self.filters.company,
 					"docstatus": 1,
 				},
-				fields=["name", "due_date", "po_no"],
+				fields=[
+					"name",
+					"due_date",
+					"po_no",
+					"retention_amount",
+					"retention_released_amount",
+					"retention_outstanding_amount",
+					"retention_release_date",
+					"net_receivable_amount",
+				],
 			)
 			for d in si_list:
+				d.amount_due_now = d.net_receivable_amount
 				self.invoice_details.setdefault(d.name, d)
 
 			# Get Sales Team
@@ -500,10 +510,21 @@ class ReceivablePayableReport:
 					"company": self.filters.company,
 					"docstatus": 1,
 				},
-				fields=["name", "due_date", "bill_no", "bill_date"],
+				fields=[
+					"name",
+					"due_date",
+					"bill_no",
+					"bill_date",
+					"retention_amount",
+					"retention_released_amount",
+					"retention_outstanding_amount",
+					"retention_release_date",
+					"net_payable_amount",
+				],
 			)
 
 			for pi in invoices:
+				pi.amount_due_now = pi.net_payable_amount
 				self.invoice_details.setdefault(pi.name, pi)
 
 		# Invoices booked via Journal Entries
@@ -1198,6 +1219,12 @@ class ReceivablePayableReport:
 			# note: fieldname is still `credit_note`
 			self.add_column(_("Debit Note"), fieldname="credit_note")
 		self.add_column(_("Outstanding Amount"), fieldname="outstanding")
+		if self.filters.get("show_retention"):
+			self.add_column(_("Retention Amount"), fieldname="retention_amount")
+			self.add_column(_("Retention Released"), fieldname="retention_released_amount")
+			self.add_column(_("Retention Outstanding"), fieldname="retention_outstanding_amount")
+			self.add_column(_("Amount Due Now"), fieldname="amount_due_now")
+			self.add_column(_("Retention Release Date"), fieldname="retention_release_date", fieldtype="Date")
 
 		self.add_column(label=_("Age (Days)"), fieldname="age", fieldtype="Int", width=80)
 		self.setup_ageing_columns()

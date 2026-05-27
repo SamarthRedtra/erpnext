@@ -622,6 +622,133 @@ frappe.ui.form.on("Purchase Invoice", {
 		});
 	},
 
+	project: function (frm) {
+		frm.events.fetch_project_retention(frm);
+	},
+
+	enable_retention(frm) {
+		frm.events.calculate_retention(frm);
+	},
+
+	retention_percentage(frm) {
+		frm.events.calculate_retention(frm);
+	},
+
+	async fetch_project_retention(frm) {
+		if (!frm.doc.project) return;
+
+		const r = await frappe.db.get_value("Project", frm.doc.project, [
+			"enable_retention",
+			"retention_percentage",
+			"retention_release_date",
+			"retention_release_after_days",
+			"enable_advance_recovery",
+			"advance_recovery_percentage",
+		]);
+		const project = r.message || {};
+		if (!cint(project.enable_retention) && !cint(project.enable_advance_recovery)) return;
+
+		if (cint(project.enable_retention)) {
+			await frm.set_value("enable_retention", 1);
+			await frm.set_value("retention_percentage", project.retention_percentage);
+			if (project.retention_release_date) {
+				await frm.set_value("retention_release_date", project.retention_release_date);
+			} else if (project.retention_release_after_days && frm.doc.posting_date) {
+				await frm.set_value(
+					"retention_release_date",
+					frappe.datetime.add_days(frm.doc.posting_date, project.retention_release_after_days)
+				);
+			}
+
+			if (!frm.doc.retention_account && frm.doc.company) {
+				const company = await frappe.db.get_value(
+					"Company",
+					frm.doc.company,
+					"default_retention_payable_account"
+				);
+				await frm.set_value(
+					"retention_account",
+					company.message && company.message.default_retention_payable_account
+				);
+			}
+
+			frm.events.calculate_retention(frm);
+		}
+
+		if (cint(project.enable_advance_recovery)) {
+			await frm.set_value("enable_advance_recovery", 1);
+			await frm.set_value("advance_recovery_percentage", project.advance_recovery_percentage);
+			await frm.set_value("allocate_advances_automatically", 1);
+			frm.events.calculate_advance_recovery(frm);
+		}
+	},
+
+	calculate_retention(frm) {
+		if (!cint(frm.doc.enable_retention)) {
+			frm.set_value({
+				retention_percentage: 0,
+				retention_amount: 0,
+				base_retention_amount: 0,
+				retention_released_amount: 0,
+				retention_outstanding_amount: 0,
+				net_payable_amount: 0,
+			});
+			return;
+		}
+
+		const total = flt(frm.doc.rounded_total || frm.doc.grand_total);
+		const base_total = flt(frm.doc.base_rounded_total || frm.doc.base_grand_total);
+		const retention_amount = flt(total * flt(frm.doc.retention_percentage) / 100, precision("retention_amount"));
+		const base_retention_amount = flt(
+			base_total * flt(frm.doc.retention_percentage) / 100,
+			precision("base_retention_amount")
+		);
+		const retention_outstanding_amount = flt(
+			retention_amount - flt(frm.doc.retention_released_amount),
+			precision("retention_outstanding_amount")
+		);
+		frm.set_value({
+			retention_amount,
+			base_retention_amount,
+			retention_outstanding_amount,
+			net_payable_amount: flt(total - retention_outstanding_amount, precision("net_payable_amount")),
+		});
+		if (frm.cscript.calculate_outstanding_amount) {
+			frm.cscript.calculate_outstanding_amount();
+		}
+	},
+
+	enable_advance_recovery(frm) {
+		frm.events.calculate_advance_recovery(frm);
+	},
+
+	advance_recovery_percentage(frm) {
+		frm.events.calculate_advance_recovery(frm);
+	},
+
+	calculate_advance_recovery(frm) {
+		if (!cint(frm.doc.enable_advance_recovery)) {
+			frm.set_value({
+				advance_recovery_percentage: 0,
+				advance_recovery_amount: 0,
+			});
+			return;
+		}
+
+		const invoice_amount =
+			frm.doc.party_account_currency == frm.doc.company_currency
+				? flt(frm.doc.base_rounded_total || frm.doc.base_grand_total)
+				: flt(frm.doc.rounded_total || frm.doc.grand_total);
+
+		frm.set_value(
+			"advance_recovery_amount",
+			flt(
+				invoice_amount * flt(frm.doc.advance_recovery_percentage) / 100,
+				precision("advance_recovery_amount")
+			)
+		);
+	},
+
 	add_custom_buttons: function (frm) {
 		if (frm.doc.docstatus == 1 && frm.doc.per_received < 100 && frm.doc.update_stock == 0) {
 			frm.add_custom_button(

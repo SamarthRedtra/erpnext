@@ -15,6 +15,7 @@ from frappe.utils.data import comma_and
 
 import erpnext
 from erpnext.accounts.deferred_revenue import validate_service_stop_date
+from erpnext.accounts.advance_recovery import validate_advance_recovery
 from erpnext.accounts.doctype.loyalty_program.loyalty_program import (
 	get_loyalty_program_details_with_points,
 	validate_loyalty_points,
@@ -30,6 +31,8 @@ from erpnext.accounts.doctype.repost_accounting_ledger.repost_accounting_ledger 
 from erpnext.accounts.doctype.tax_withholding_entry.tax_withholding_entry import SalesTaxWithholding
 from erpnext.accounts.general_ledger import get_round_off_account_and_cost_center
 from erpnext.accounts.party import get_due_date, get_party_account, get_party_details
+from erpnext.accounts.progressive_billing import set_progressive_billing_values
+from erpnext.accounts.retention import append_retention_gl_entry, calculate_retention, validate_retention
 from erpnext.accounts.utils import (
 	get_account_currency,
 	update_voucher_outstanding,
@@ -300,6 +303,8 @@ class SalesInvoice(SellingController):
 	def validate(self):
 		self.validate_auto_set_posting_time()
 		super().validate()
+		validate_advance_recovery(self)
+		validate_retention(self)
 
 		self.is_subcontracted()
 
@@ -355,6 +360,7 @@ class SalesInvoice(SellingController):
 			self.is_opening = "No"
 
 		self.set_against_income_account()
+		validate_retention(self)
 
 		if self.is_return and not self.return_against and self.timesheets:
 			frappe.throw(_("Direct return is not allowed for Timesheet."))
@@ -363,6 +369,7 @@ class SalesInvoice(SellingController):
 			self.validate_time_sheets_are_submitted()
 
 		self.validate_multiple_billing("Delivery Note", "dn_detail", "amount")
+		set_progressive_billing_values(self)
 
 		if self.is_return and self.return_against:
 			for row in self.timesheets:
@@ -761,6 +768,8 @@ class SalesInvoice(SellingController):
 			)
 
 		super().set_missing_values(for_validate)
+		validate_advance_recovery(self)
+		calculate_retention(self)
 
 		print_format = pos.get("print_format") if pos else None
 		if not print_format and not cint(frappe.db.get_value("Print Format", "POS Invoice", "disabled")):
@@ -1582,6 +1591,7 @@ class SalesInvoice(SellingController):
 		gl_entries = []
 
 		self.make_customer_gl_entry(gl_entries)
+		append_retention_gl_entry(self, gl_entries)
 
 		self.make_tax_gl_entries(gl_entries)
 		self.make_internal_transfer_gl_entries(gl_entries)
@@ -1697,6 +1707,12 @@ class SalesInvoice(SellingController):
 			else self.base_grand_total,
 			self.precision("base_grand_total"),
 		)
+		if self.get("enable_retention"):
+			grand_total = flt(grand_total - flt(self.retention_amount), self.precision("grand_total"))
+			base_grand_total = flt(
+				base_grand_total - flt(self.base_retention_amount),
+				self.precision("base_grand_total"),
+			)
 
 		if grand_total and not self.is_internal_transfer():
 			against_voucher = self.name

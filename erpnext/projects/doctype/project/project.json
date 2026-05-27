@@ -38,6 +38,15 @@
   "total_billed_amount",
   "total_consumed_material_cost",
   "cost_center",
+  "retention_section",
+  "enable_retention",
+  "retention_percentage",
+  "column_break_retention",
+  "retention_release_date",
+  "retention_release_after_days",
+  "advance_recovery_section",
+  "enable_advance_recovery",
+  "advance_recovery_percentage",
   "margin",
   "gross_margin",
   "column_break_37",
@@ -333,6 +342,59 @@
    "fieldtype": "Link",
    "label": "Default Cost Center",
    "options": "Cost Center"
+  },
+  {
+   "fieldname": "retention_section",
+   "fieldtype": "Section Break",
+   "label": "Retention"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_retention",
+   "fieldtype": "Check",
+   "label": "Enable Retention"
+  },
+  {
+   "depends_on": "enable_retention",
+   "fieldname": "retention_percentage",
+   "fieldtype": "Percent",
+   "label": "Retention %"
+  },
+  {
+   "fieldname": "column_break_retention",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "enable_retention",
+   "fieldname": "retention_release_date",
+   "fieldtype": "Date",
+   "label": "Retention Release Date"
+  },
+  {
+   "depends_on": "enable_retention",
+   "description": "Used to derive the retention release date on invoices when a fixed release date is not set.",
+   "fieldname": "retention_release_after_days",
+   "fieldtype": "Int",
+   "label": "Retention Release After (Days)",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "advance_recovery_section",
+   "fieldtype": "Section Break",
+   "label": "Advance Recovery"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_advance_recovery",
+   "fieldtype": "Check",
+   "label": "Enable Advance Recovery"
+  },
+  {
+   "depends_on": "enable_advance_recovery",
+   "description": "Percentage of each invoice value to recover from available advances.",
+   "fieldname": "advance_recovery_percentage",
+   "fieldtype": "Percent",
+   "label": "Advance Recovery %"
   },
   {
    "fieldname": "margin",

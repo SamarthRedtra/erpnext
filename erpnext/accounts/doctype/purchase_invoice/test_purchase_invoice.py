@@ -1223,6 +1223,27 @@ class TestPurchaseInvoice(ERPNextTestSuite, StockTestMixin):
 		for gle in gl_entries:
 			self.assertEqual(expected_values[gle.account]["project"], gle.project)
 
+	def test_purchase_invoice_progressive_billing_values(self):
+		po = create_purchase_order(item_code="_Test Item", qty=10, rate=100)
+
+		first_invoice = make_pi_from_po(po.name)
+		first_invoice.items[0].qty = 4
+		first_invoice.save()
+		first_invoice.submit()
+
+		second_invoice = make_pi_from_po(po.name)
+		second_invoice.items[0].qty = 3
+		second_invoice.save()
+
+		row = second_invoice.items[0]
+		self.assertEqual(row.previous_billed_qty, 4)
+		self.assertEqual(row.previous_billed_amount, 400)
+		self.assertEqual(row.current_billed_qty, 3)
+		self.assertEqual(row.current_billed_amount, 300)
+		self.assertEqual(row.accumulated_billed_qty, 7)
+		self.assertEqual(row.accumulated_billed_amount, 700)
+		self.assertEqual(row.billing_percentage, 70)
+
 	def test_deferred_expense_via_journal_entry(self):
 		deferred_account = create_account(
 			account_name="Deferred Expense", parent_account="Current Assets - _TC", company="_Test Company"

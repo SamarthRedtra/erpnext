@@ -2450,6 +2450,86 @@ class TestSalesInvoice(ERPNextTestSuite):
 		for gle in gl_entries:
 			self.assertEqual(expected_values[gle.account]["project"], gle.project)
 
+	def test_sales_invoice_with_project_retention(self):
+		from erpnext.projects.doctype.project.test_project import make_project
+
+		retention_account = create_account(
+			parent_account="Accounts Receivable - _TC",
+			account_name="Retention Receivable",
+			company="_Test Company",
+			account_type="Receivable",
+		)
+		frappe.db.set_value(
+			"Company", "_Test Company", "default_retention_receivable_account", retention_account
+		)
+
+		project = make_project({"project_name": "Retention Project", "company": "_Test Company"})
+		project.enable_retention = 1
+		project.retention_percentage = 10
+		project.save()
+
+		si = create_sales_invoice(rate=1000, do_not_submit=True)
+		si.project = project.name
+		si.save()
+		si.submit()
+
+		si.load_from_db()
+		self.assertEqual(si.retention_amount, 100)
+		self.assertEqual(si.net_receivable_amount, 900)
+		self.assertEqual(si.retention_outstanding_amount, 100)
+
+		normal_receivable = frappe.db.get_value(
+			"GL Entry",
+			{"voucher_type": si.doctype, "voucher_no": si.name, "account": si.debit_to},
+			"debit",
+		)
+		retention_receivable = frappe.db.get_value(
+			"GL Entry",
+			{"voucher_type": si.doctype, "voucher_no": si.name, "account": retention_account},
+			"debit",
+		)
+		self.assertEqual(normal_receivable, 900)
+		self.assertEqual(retention_receivable, 100)
+
+		release = frappe.get_doc(
+			{
+				"doctype": "Retention Release Entry",
+				"reference_doctype": "Sales Invoice",
+				"reference_name": si.name,
+				"retention_amount": 100,
+			}
+		)
+		release.insert()
+		release.submit()
+
+		si.load_from_db()
+		self.assertEqual(si.retention_released_amount, 100)
+		self.assertEqual(si.retention_outstanding_amount, 0)
+
+	def test_sales_invoice_progressive_billing_values(self):
+		from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
+		from erpnext.selling.doctype.sales_order.test_sales_order import make_sales_order
+
+		sales_order = make_sales_order(item_code="_Test Item", qty=10, rate=100)
+
+		first_invoice = make_sales_invoice(sales_order.name)
+		first_invoice.items[0].qty = 4
+		first_invoice.save()
+		first_invoice.submit()
+
+		second_invoice = make_sales_invoice(sales_order.name)
+		second_invoice.items[0].qty = 3
+		second_invoice.save()
+
+		row = second_invoice.items[0]
+		self.assertEqual(row.previous_billed_qty, 4)
+		self.assertEqual(row.previous_billed_amount, 400)
+		self.assertEqual(row.current_billed_qty, 3)
+		self.assertEqual(row.current_billed_amount, 300)
+		self.assertEqual(row.accumulated_billed_qty, 7)
+		self.assertEqual(row.accumulated_billed_amount, 700)
+		self.assertEqual(row.billing_percentage, 70)
+
 	def test_sales_invoice_without_cost_center(self):
 		cost_center = "_Test Cost Center - _TC"
 		si = create_sales_invoice(debit_to="Debtors - _TC")

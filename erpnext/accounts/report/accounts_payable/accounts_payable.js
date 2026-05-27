@@ -142,6 +142,11 @@ frappe.query_reports["Accounts Payable"] = {
 			fieldtype: "Check",
 		},
 		{
+			fieldname: "show_retention",
+			label: __("Show Retention"),
+			fieldtype: "Check",
+		},
+		{
 			fieldname: "in_party_currency",
 			label: __("In Party Currency"),
 			fieldtype: "Check",

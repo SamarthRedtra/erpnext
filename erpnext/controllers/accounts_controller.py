@@ -30,6 +30,7 @@ from frappe.utils import (
 )
 
 import erpnext
+from erpnext.accounts.advance_recovery import get_advance_recovery_limit
 from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 	get_accounting_dimensions,
 	get_dimensions,
@@ -1515,12 +1516,17 @@ class AccountsController(TransactionBase):
 
 		self.set("advances", [])
 		advance_allocated = 0
+		recovery_limit = get_advance_recovery_limit(self)
 		for d in res:
 			if self.get("party_account_currency") == self.company_currency:
 				amount = self.get("base_rounded_total") or self.base_grand_total
 			else:
 				amount = self.get("rounded_total") or self.grand_total
+			if recovery_limit is not None:
+				amount = recovery_limit
 			allocated_amount = min(amount - advance_allocated, d.amount)
+			if allocated_amount <= 0:
+				break
 			advance_allocated += flt(allocated_amount)
 
 			advance_row = {
@@ -2550,6 +2556,11 @@ class AccountsController(TransactionBase):
 			if self.doctype != "Sales Order":
 				base_grand_total = base_grand_total - flt(self.base_write_off_amount)
 				grand_total = grand_total - flt(self.write_off_amount)
+				if self.get("enable_retention"):
+					grand_total = grand_total - flt(self.get("retention_outstanding_amount"))
+					base_grand_total = base_grand_total - flt(
+						flt(self.get("retention_outstanding_amount")) * self.get("conversion_rate")
+					)
 
 		if self.get("total_advance"):
 			if party_account_currency == self.company_currency:
@@ -2773,6 +2784,11 @@ class AccountsController(TransactionBase):
 			if self.doctype in ("Sales Invoice", "Purchase Invoice"):
 				base_grand_total = base_grand_total - flt(self.base_write_off_amount)
 				grand_total = grand_total - flt(self.write_off_amount)
+				if self.get("enable_retention"):
+					grand_total = grand_total - flt(self.get("retention_outstanding_amount"))
+					base_grand_total = base_grand_total - flt(
+						flt(self.get("retention_outstanding_amount")) * self.get("conversion_rate")
+					)
 
 			if self.get("total_advance"):
 				if party_account_currency == self.company_currency:

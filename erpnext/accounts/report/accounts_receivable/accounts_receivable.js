@@ -159,6 +159,11 @@ frappe.query_reports["Accounts Receivable"] = {
 			fieldtype: "Check",
 		},
 		{
+			fieldname: "show_retention",
+			label: __("Show Retention"),
+			fieldtype: "Check",
+		},
+		{
 			fieldname: "show_delivery_notes",
 			label: __("Show Linked Delivery Notes"),
 			fieldtype: "Check",

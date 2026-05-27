@@ -975,6 +975,11 @@ class calculate_taxes_and_totals:
 			if self.doc.get("write_off_outstanding_amount_automatically"):
 				self.doc.write_off_amount = 0
 
+			if self.doc.get("enable_advance_recovery"):
+				from erpnext.accounts.advance_recovery import get_advance_recovery_limit
+
+				self.doc.advance_recovery_amount = get_advance_recovery_limit(self.doc)
+
 			self.calculate_outstanding_amount()
 			self.calculate_write_off_amount()
 
@@ -1016,13 +1021,21 @@ class calculate_taxes_and_totals:
 
 			if self.doc.party_account_currency == self.doc.currency:
 				total_amount_to_pay = flt(
-					grand_total - self.doc.total_advance - flt(self.doc.write_off_amount),
+					grand_total
+					- self.doc.total_advance
+					- flt(self.doc.write_off_amount)
+					- flt(self.doc.get("retention_outstanding_amount")),
 					self.doc.precision("grand_total"),
 				)
 			else:
+				base_retention_outstanding = flt(
+					flt(self.doc.get("retention_outstanding_amount")) * self.doc.conversion_rate,
+					self.doc.precision("base_grand_total"),
+				)
 				total_amount_to_pay = flt(
 					flt(base_grand_total, self.doc.precision("base_grand_total"))
 					- self.doc.total_advance
+					- base_retention_outstanding
 					- flt(self.doc.base_write_off_amount),
 					self.doc.precision("base_grand_total"),
 				)

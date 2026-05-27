@@ -943,14 +943,18 @@ erpnext.taxes_and_totals = class TaxesAndTotals extends erpnext.payments {
 
 			if (this.frm.doc.party_account_currency == this.frm.doc.currency) {
 				var total_amount_to_pay = flt(
-					grand_total - this.frm.doc.total_advance - this.frm.doc.write_off_amount,
+					grand_total -
+						this.frm.doc.total_advance -
+						this.frm.doc.write_off_amount -
+						flt(this.frm.doc.retention_outstanding_amount),
 					precision("grand_total")
 				);
 			} else {
 				var total_amount_to_pay = flt(
 					flt(base_grand_total, precision("base_grand_total")) -
 						this.frm.doc.total_advance -
-						this.frm.doc.base_write_off_amount,
+						this.frm.doc.base_write_off_amount -
+						flt(this.frm.doc.retention_outstanding_amount) * this.frm.doc.conversion_rate,
 					precision("base_grand_total")
 				);
 			}
@@ -995,14 +999,18 @@ erpnext.taxes_and_totals = class TaxesAndTotals extends erpnext.payments {
 
 		if (this.frm.doc.party_account_currency == this.frm.doc.currency) {
 			var total_amount_to_pay = flt(
-				grand_total - this.frm.doc.total_advance - this.frm.doc.write_off_amount,
+				grand_total -
+					this.frm.doc.total_advance -
+					this.frm.doc.write_off_amount -
+					flt(this.frm.doc.retention_outstanding_amount),
 				precision("grand_total")
 			);
 		} else {
 			var total_amount_to_pay = flt(
 				flt(base_grand_total, precision("base_grand_total")) -
 					this.frm.doc.total_advance -
-					this.frm.doc.base_write_off_amount,
+					this.frm.doc.base_write_off_amount -
+					flt(this.frm.doc.retention_outstanding_amount) * this.frm.doc.conversion_rate,
 				precision("base_grand_total")
 			);
 		}
