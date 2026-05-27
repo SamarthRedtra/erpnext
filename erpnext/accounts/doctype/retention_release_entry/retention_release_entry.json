@@ -93,7 +93,6 @@
    "fieldtype": "Link",
    "label": "Party Account",
    "options": "Account",
-   "read_only": 1,
    "reqd": 1
   },
   {
@@ -101,7 +100,6 @@
    "fieldtype": "Link",
    "label": "Retention Account",
    "options": "Account",
-   "read_only": 1,
    "reqd": 1
   },
   {

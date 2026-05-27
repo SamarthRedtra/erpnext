@@ -125,6 +125,24 @@ erpnext.accounts.PurchaseInvoice = class PurchaseInvoice extends erpnext.buying.
 			this.frm.page.set_inner_btn_group_as_primary(__("Create"));
 		}
 
+		if (
+			doc.docstatus == 1 &&
+			cint(doc.enable_retention) &&
+			flt(doc.retention_outstanding_amount) > 0 &&
+			frappe.model.can_create("Retention Release Entry")
+		) {
+			this.frm.add_custom_button(
+				__("Release Retention"),
+				() => {
+					frappe.new_doc("Retention Release Entry", {
+						reference_doctype: "Purchase Invoice",
+						reference_name: doc.name,
+					});
+				},
+				__("Create")
+			);
+		}
+
 		if (!doc.is_return && doc.docstatus == 1) {
 			if (doc.outstanding_amount >= 0 || Math.abs(flt(doc.outstanding_amount)) < flt(doc.grand_total)) {
 				this.frm.add_custom_button(

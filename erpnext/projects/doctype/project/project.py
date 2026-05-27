@@ -353,6 +353,7 @@ class Project(Document):
 		self.update_purchase_costing()
 		self.update_sales_amount()
 		self.update_billed_amount()
+		self.update_retention_and_advance_totals()
 		self.calculate_gross_margin()
 
 	def calculate_gross_margin(self):
@@ -383,6 +384,24 @@ class Project(Document):
 
 	def update_billed_amount(self):
 		self.total_billed_amount = self.get_billed_amount_from_parent() + self.get_billed_amount_from_child()
+
+	def update_retention_and_advance_totals(self):
+		sales_totals = get_project_invoice_retention_and_advance_totals(
+			"Sales Invoice", self.name, self.company
+		)
+		purchase_totals = get_project_invoice_retention_and_advance_totals(
+			"Purchase Invoice", self.name, self.company
+		)
+
+		self.sales_invoice_advance_amount = sales_totals.advance_amount
+		self.sales_retention_amount = sales_totals.retention_amount
+		self.sales_retention_released_amount = sales_totals.retention_released_amount
+		self.sales_retention_outstanding_amount = sales_totals.retention_outstanding_amount
+
+		self.purchase_invoice_advance_amount = purchase_totals.advance_amount
+		self.purchase_retention_amount = purchase_totals.retention_amount
+		self.purchase_retention_released_amount = purchase_totals.retention_released_amount
+		self.purchase_retention_outstanding_amount = purchase_totals.retention_outstanding_amount
 
 	def get_billed_amount_from_parent(self):
 		total_billed_amount = frappe.db.sql(
@@ -752,6 +771,168 @@ def update_project_sales_billing():
 	# Else simply fallback to Daily
 	for project in frappe.get_all("Project", filters={"status": ["!=", "Cancelled"]}):
 		frappe.get_doc("Project", project.name).save()
+
+
+def get_project_invoice_retention_and_advance_totals(
+	invoice_doctype: str, project: str, company: str | None = None
+) -> frappe._dict:
+	if invoice_doctype not in ("Sales Invoice", "Purchase Invoice"):
+		frappe.throw(_("Invalid invoice type {0}").format(invoice_doctype))
+
+	company_currency = frappe.get_cached_value("Company", company, "default_currency") if company else None
+	table = f"`tab{invoice_doctype}`"
+	totals = frappe.db.sql(
+		f"""
+		select
+			sum(
+				case
+					when ifnull(party_account_currency, '') = %(company_currency)s
+						then ifnull(total_advance, 0)
+					else ifnull(total_advance, 0) * ifnull(conversion_rate, 1)
+				end
+			) as advance_amount,
+			sum(
+				case
+					when ifnull(base_retention_amount, 0) != 0
+						then ifnull(base_retention_amount, 0)
+					when ifnull(party_account_currency, '') = %(company_currency)s
+						then ifnull(retention_amount, 0)
+					else ifnull(retention_amount, 0) * ifnull(conversion_rate, 1)
+				end
+			) as retention_amount,
+			sum(
+				case
+					when ifnull(party_account_currency, '') = %(company_currency)s
+						then ifnull(retention_released_amount, 0)
+					else ifnull(retention_released_amount, 0) * ifnull(conversion_rate, 1)
+				end
+			) as retention_released_amount,
+			sum(
+				case
+					when ifnull(party_account_currency, '') = %(company_currency)s
+						then ifnull(retention_outstanding_amount, 0)
+					else ifnull(retention_outstanding_amount, 0) * ifnull(conversion_rate, 1)
+				end
+			) as retention_outstanding_amount
+		from {table}
+		where project = %(project)s and docstatus = 1
+		""",
+		{"project": project, "company_currency": company_currency},
+		as_dict=True,
+	)[0]
+
+	return frappe._dict({key: flt(totals.get(key)) for key in totals})
+
+
+def get_project_retention_release_invoices(
+	project: str, invoice_type: str, release_due_by: str | None = None, party: str | None = None
+) -> list[frappe._dict]:
+	invoice_doctypes = (
+		("Sales Invoice", "customer"),
+		("Purchase Invoice", "supplier"),
+	)
+	if invoice_type != "Both":
+		if invoice_type not in ("Sales Invoice", "Purchase Invoice"):
+			frappe.throw(_("Invalid invoice type {0}").format(invoice_type))
+		invoice_doctypes = tuple(
+			item for item in invoice_doctypes if item[0] == invoice_type
+		)
+
+	invoices = []
+	for doctype, party_field in invoice_doctypes:
+		filters = {
+			"project": project,
+			"docstatus": 1,
+			"retention_outstanding_amount": [">", 0],
+		}
+		if release_due_by:
+			filters["retention_release_date"] = ["<=", release_due_by]
+		if party:
+			filters[party_field] = party
+
+		for invoice in frappe.get_all(
+			doctype,
+			filters=filters,
+			fields=[
+				"name",
+				"company",
+				f"{party_field} as party",
+				"retention_outstanding_amount",
+			],
+			order_by="posting_date asc, creation asc",
+		):
+			invoice.reference_doctype = doctype
+			invoices.append(invoice)
+
+	return invoices
+
+
+@frappe.whitelist()
+def bulk_release_retention(
+	project: str,
+	invoice_type: str,
+	posting_date: str,
+	release_due_by: str | None = None,
+	party: str | None = None,
+) -> frappe._dict:
+	project_doc = frappe.get_doc("Project", project)
+	frappe.has_permission(doc=project_doc, throw=True)
+
+	if not posting_date:
+		frappe.throw(_("Posting Date is mandatory"))
+
+	invoices = get_project_retention_release_invoices(project, invoice_type, release_due_by, party)
+	if not invoices:
+		frappe.throw(_("No submitted invoices with outstanding retention were found for this Project"))
+
+	created_entries = []
+	total_released = 0
+	for invoice in invoices:
+		release_entry = frappe.get_doc(
+			{
+				"doctype": "Retention Release Entry",
+				"reference_doctype": invoice.reference_doctype,
+				"reference_name": invoice.name,
+				"posting_date": posting_date,
+				"retention_amount": invoice.retention_outstanding_amount,
+			}
+		)
+		release_entry.insert()
+		release_entry.submit()
+
+		created_entries.append(
+			{
+				"name": release_entry.name,
+				"reference_doctype": invoice.reference_doctype,
+				"reference_name": invoice.name,
+				"retention_amount": release_entry.retention_amount,
+			}
+		)
+		total_released += flt(release_entry.retention_amount)
+
+	project_doc.reload()
+	project_doc.update_retention_and_advance_totals()
+	frappe.db.set_value(
+		"Project",
+		project_doc.name,
+		{
+			"sales_invoice_advance_amount": project_doc.sales_invoice_advance_amount,
+			"sales_retention_amount": project_doc.sales_retention_amount,
+			"sales_retention_released_amount": project_doc.sales_retention_released_amount,
+			"sales_retention_outstanding_amount": project_doc.sales_retention_outstanding_amount,
+			"purchase_invoice_advance_amount": project_doc.purchase_invoice_advance_amount,
+			"purchase_retention_amount": project_doc.purchase_retention_amount,
+			"purchase_retention_released_amount": project_doc.purchase_retention_released_amount,
+			"purchase_retention_outstanding_amount": project_doc.purchase_retention_outstanding_amount,
+		},
+		update_modified=False,
+	)
+
+	return frappe._dict(
+		created_entries=created_entries,
+		count=len(created_entries),
+		total_released=total_released,
+	)
 
 
 @frappe.whitelist()

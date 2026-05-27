@@ -95,6 +95,28 @@ frappe.ui.form.on("Project", {
 				__("Actions")
 			);
 
+			const has_outstanding_retention =
+				flt(frm.doc.sales_retention_outstanding_amount) ||
+				flt(frm.doc.purchase_retention_outstanding_amount);
+			if (cint(frm.doc.enable_retention) || has_outstanding_retention) {
+				frm.add_custom_button(
+					__("Release Retention"),
+					() => {
+						frappe.set_route("query-report", "Retention Report", {
+							company: frm.doc.company,
+							project: frm.doc.name,
+						});
+					},
+					__("Actions")
+				);
+
+				frm.add_custom_button(
+					__("Bulk Release Retention"),
+					() => frm.events.bulk_release_retention(frm),
+					__("Actions")
+				);
+			}
+
 			frm.trigger("set_project_status_button");
 
 			if (frappe.model.can_read("Task")) {
@@ -142,6 +164,105 @@ frappe.ui.form.on("Project", {
 				}
 			},
 		});
+	},
+
+	bulk_release_retention: function (frm) {
+		const dialog = new frappe.ui.Dialog({
+			title: __("Bulk Release Retention"),
+			fields: [
+				{
+					fieldname: "invoice_type",
+					fieldtype: "Select",
+					label: __("Invoice Type"),
+					options: "Sales Invoice\nPurchase Invoice\nBoth",
+					default: "Both",
+					reqd: 1,
+					onchange: () => {
+						const invoice_type = dialog.get_value("invoice_type");
+						dialog.set_value("customer", "");
+						dialog.set_value("supplier", "");
+						dialog.set_df_property(
+							"customer",
+							"hidden",
+							invoice_type !== "Sales Invoice"
+						);
+						dialog.set_df_property(
+							"supplier",
+							"hidden",
+							invoice_type !== "Purchase Invoice"
+						);
+					},
+				},
+				{
+					fieldname: "posting_date",
+					fieldtype: "Date",
+					label: __("Posting Date"),
+					default: frappe.datetime.get_today(),
+					reqd: 1,
+				},
+				{
+					fieldname: "release_due_by",
+					fieldtype: "Date",
+					label: __("Release Due By"),
+				},
+				{
+					fieldname: "customer",
+					fieldtype: "Link",
+					label: __("Customer"),
+					options: "Customer",
+					hidden: 1,
+					description: __("Optional customer filter."),
+				},
+				{
+					fieldname: "supplier",
+					fieldtype: "Link",
+					label: __("Supplier"),
+					options: "Supplier",
+					hidden: 1,
+					description: __("Optional supplier filter."),
+				},
+			],
+			primary_action_label: __("Release"),
+			primary_action: (values) => {
+				const party =
+					values.invoice_type === "Sales Invoice"
+						? values.customer
+						: values.invoice_type === "Purchase Invoice"
+							? values.supplier
+							: null;
+				dialog.disable_primary_action();
+				frappe.call({
+					method: "erpnext.projects.doctype.project.project.bulk_release_retention",
+					args: {
+						project: frm.doc.name,
+						invoice_type: values.invoice_type,
+						posting_date: values.posting_date,
+						release_due_by: values.release_due_by,
+						party: party,
+					},
+					freeze: true,
+					freeze_message: __("Creating Retention Release Entries..."),
+					callback: (r) => {
+						if (r.message) {
+							frappe.msgprint(
+								__("Created {0} Retention Release Entries for {1}.", [
+									r.message.count,
+									format_currency(r.message.total_released),
+								])
+							);
+							dialog.hide();
+							frm.reload_doc();
+						}
+					},
+					always: () => {
+						dialog.enable_primary_action();
+					},
+				});
+			},
+		});
+
+		dialog.show();
+		dialog.fields_dict.invoice_type.df.onchange();
 	},
 
 	set_project_status_button: function (frm) {

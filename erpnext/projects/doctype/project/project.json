@@ -47,6 +47,16 @@
   "advance_recovery_section",
   "enable_advance_recovery",
   "advance_recovery_percentage",
+  "retention_and_advance_summary_section",
+  "sales_invoice_advance_amount",
+  "sales_retention_amount",
+  "sales_retention_released_amount",
+  "sales_retention_outstanding_amount",
+  "column_break_retention_summary",
+  "purchase_invoice_advance_amount",
+  "purchase_retention_amount",
+  "purchase_retention_released_amount",
+  "purchase_retention_outstanding_amount",
   "margin",
   "gross_margin",
   "column_break_37",
@@ -395,6 +405,72 @@
    "fieldname": "advance_recovery_percentage",
    "fieldtype": "Percent",
    "label": "Advance Recovery %"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "retention_and_advance_summary_section",
+   "fieldtype": "Section Break",
+   "label": "Retention and Advance Summary"
+  },
+  {
+   "fieldname": "sales_invoice_advance_amount",
+   "fieldtype": "Currency",
+   "label": "Sales Invoice Advance Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_retention_amount",
+   "fieldtype": "Currency",
+   "label": "Sales Retention Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_retention_released_amount",
+   "fieldtype": "Currency",
+   "label": "Sales Retention Released Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_retention_outstanding_amount",
+   "fieldtype": "Currency",
+   "label": "Sales Retention Outstanding Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_retention_summary",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "purchase_invoice_advance_amount",
+   "fieldtype": "Currency",
+   "label": "Purchase Invoice Advance Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "purchase_retention_amount",
+   "fieldtype": "Currency",
+   "label": "Purchase Retention Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "purchase_retention_released_amount",
+   "fieldtype": "Currency",
+   "label": "Purchase Retention Released Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "purchase_retention_outstanding_amount",
+   "fieldtype": "Currency",
+   "label": "Purchase Retention Outstanding Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
   },
   {
    "fieldname": "margin",

@@ -99,6 +99,24 @@ erpnext.accounts.SalesInvoiceController = class SalesInvoiceController extends (
 			this.frm.page.set_inner_btn_group_as_primary(__("Create"));
 		}
 
+		if (
+			doc.docstatus == 1 &&
+			cint(doc.enable_retention) &&
+			flt(doc.retention_outstanding_amount) > 0 &&
+			frappe.model.can_create("Retention Release Entry")
+		) {
+			this.frm.add_custom_button(
+				__("Release Retention"),
+				() => {
+					frappe.new_doc("Retention Release Entry", {
+						reference_doctype: "Sales Invoice",
+						reference_name: doc.name,
+					});
+				},
+				__("Create")
+			);
+		}
+
 		if (doc.docstatus == 1 && !doc.is_return) {
 			var is_delivered_by_supplier = false;
 

@@ -46,6 +46,7 @@ def get_columns():
 		{"label": _("Release Date"), "fieldname": "retention_release_date", "fieldtype": "Date"},
 		{"label": _("Retention Account"), "fieldname": "retention_account", "fieldtype": "Link", "options": "Account"},
 		{"label": _("Status"), "fieldname": "retention_status", "fieldtype": "Data"},
+		{"label": _("Release Retention"), "fieldname": "release_retention", "fieldtype": "Data"},
 	]
 
 
@@ -115,5 +116,6 @@ def get_invoice_data(doctype, filters):
 		row.invoice_type = doctype
 		row.party_type = party_type
 		row.retention_status = "Released" if flt(row.retention_outstanding_amount) == 0 else "Outstanding"
+		row.release_retention = "Release Retention" if flt(row.retention_outstanding_amount) > 0 else ""
 
 	return rows

@@ -10,6 +10,57 @@ from erpnext.accounts.general_ledger import make_gl_entries, make_reverse_gl_ent
 from erpnext.accounts.utils import get_account_currency, update_voucher_outstanding
 
 
+@frappe.whitelist()
+def get_retention_release_details(
+	reference_doctype: str, reference_name: str, retention_amount: float | None = None
+):
+	if reference_doctype not in ("Sales Invoice", "Purchase Invoice"):
+		frappe.throw(_("Reference Document Type must be Sales Invoice or Purchase Invoice"))
+
+	invoice = frappe.get_doc(reference_doctype, reference_name)
+	if invoice.docstatus != 1:
+		frappe.throw(_("Reference invoice must be submitted"))
+	if not invoice.get("enable_retention"):
+		frappe.throw(_("Retention is not enabled on reference invoice"))
+
+	if reference_doctype == "Sales Invoice":
+		party_type = "Customer"
+		party = invoice.customer
+		party_account = invoice.debit_to
+		default_retention_account_field = "default_retention_receivable_account"
+	else:
+		party_type = "Supplier"
+		party = invoice.supplier
+		party_account = invoice.credit_to
+		default_retention_account_field = "default_retention_payable_account"
+
+	retention_account = invoice.retention_account or frappe.get_cached_value(
+		"Company", invoice.company, default_retention_account_field
+	)
+	if not retention_account:
+		frappe.throw(
+			_("Retention Account is missing on reference invoice and Company default retention account")
+		)
+
+	release_amount = flt(retention_amount) or flt(invoice.retention_outstanding_amount)
+	return frappe._dict(
+		company=invoice.company,
+		posting_date=nowdate(),
+		party_type=party_type,
+		party=party,
+		project=invoice.project,
+		party_account=party_account,
+		retention_account=retention_account,
+		party_account_currency=invoice.party_account_currency,
+		retention_amount=release_amount,
+		base_retention_amount=flt(
+			release_amount * flt(invoice.conversion_rate),
+			frappe.get_precision("Retention Release Entry", "base_retention_amount"),
+		),
+		retention_outstanding_amount=invoice.retention_outstanding_amount,
+	)
+
+
 class RetentionReleaseEntry(Document):
 	def set_missing_values(self):
 		if not self.posting_date:
@@ -18,26 +69,12 @@ class RetentionReleaseEntry(Document):
 		if not self.reference_doctype or not self.reference_name:
 			return
 
-		invoice = frappe.get_cached_doc(self.reference_doctype, self.reference_name)
-		if self.reference_doctype == "Sales Invoice":
-			self.party_type = "Customer"
-			self.party = invoice.customer
-			self.party_account = invoice.debit_to
-		else:
-			self.party_type = "Supplier"
-			self.party = invoice.supplier
-			self.party_account = invoice.credit_to
-
-		self.company = invoice.company
-		self.project = invoice.project
-		self.retention_account = invoice.retention_account
-		self.party_account_currency = invoice.party_account_currency
-		if not self.retention_amount:
-			self.retention_amount = invoice.retention_outstanding_amount
-		self.base_retention_amount = flt(
-			flt(self.retention_amount) * flt(invoice.conversion_rate),
-			self.precision("base_retention_amount"),
+		details = get_retention_release_details(
+			self.reference_doctype, self.reference_name, self.retention_amount
 		)
+		if self.posting_date:
+			details.posting_date = self.posting_date
+		self.update(details)
 
 	def validate(self):
 		self.set_missing_values()
@@ -49,8 +86,10 @@ class RetentionReleaseEntry(Document):
 			frappe.throw(_("Reference invoice must be submitted"))
 		if not invoice.get("enable_retention"):
 			frappe.throw(_("Retention is not enabled on reference invoice"))
-		if not invoice.get("retention_account"):
-			frappe.throw(_("Retention Account is missing on reference invoice"))
+		if not self.retention_account:
+			frappe.throw(_("Retention Account is mandatory"))
+		if not self.party_account:
+			frappe.throw(_("Party Account is mandatory"))
 		if flt(self.retention_amount) <= 0:
 			frappe.throw(_("Retention Release Amount must be greater than zero"))
 		if flt(self.retention_amount) > flt(invoice.retention_outstanding_amount):

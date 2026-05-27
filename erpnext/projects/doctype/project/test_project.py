@@ -32,6 +32,121 @@ class TestProject(ERPNextTestSuite):
 		self.assertEqual(project.total_costing_amount, 3200)
 		self.assertEqual(project.total_billable_amount, 8000)
 
+	def test_project_retention_and_advance_totals(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		from erpnext.accounts.doctype.purchase_invoice.test_purchase_invoice import make_purchase_invoice
+		from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_sales_invoice
+
+		retention_receivable = create_account(
+			parent_account="Accounts Receivable - _TC",
+			account_name=f"Retention Receivable {frappe.generate_hash(length=5)}",
+			company="_Test Company",
+			account_type="Receivable",
+		)
+		retention_payable = create_account(
+			parent_account="Accounts Payable - _TC",
+			account_name=f"Retention Payable {frappe.generate_hash(length=5)}",
+			company="_Test Company",
+			account_type="Payable",
+		)
+		frappe.db.set_value(
+			"Company", "_Test Company", "default_retention_receivable_account", retention_receivable
+		)
+		frappe.db.set_value(
+			"Company", "_Test Company", "default_retention_payable_account", retention_payable
+		)
+
+		project = make_project(
+			{"project_name": f"Project Retention Totals {frappe.generate_hash(length=5)}"}
+		)
+		project.enable_retention = 1
+		project.retention_percentage = 10
+		project.save()
+
+		sales_invoice = create_sales_invoice(rate=1000, do_not_submit=True)
+		sales_invoice.project = project.name
+		sales_invoice.save()
+		sales_invoice.submit()
+		frappe.db.set_value("Sales Invoice", sales_invoice.name, "total_advance", 25)
+
+		purchase_invoice = make_purchase_invoice(qty=1, rate=500, do_not_save=True)
+		purchase_invoice.project = project.name
+		purchase_invoice.save()
+		purchase_invoice.submit()
+		frappe.db.set_value("Purchase Invoice", purchase_invoice.name, "total_advance", 15)
+
+		project.reload()
+		project.update_costing()
+
+		self.assertEqual(project.sales_invoice_advance_amount, 25)
+		self.assertEqual(project.sales_retention_amount, 100)
+		self.assertEqual(project.sales_retention_outstanding_amount, 100)
+		self.assertEqual(project.purchase_invoice_advance_amount, 15)
+		self.assertEqual(project.purchase_retention_amount, 50)
+		self.assertEqual(project.purchase_retention_outstanding_amount, 50)
+
+	def test_project_bulk_release_retention(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		from erpnext.accounts.doctype.purchase_invoice.test_purchase_invoice import make_purchase_invoice
+		from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_sales_invoice
+		from erpnext.projects.doctype.project.project import bulk_release_retention
+
+		retention_receivable = create_account(
+			parent_account="Accounts Receivable - _TC",
+			account_name=f"Retention Receivable {frappe.generate_hash(length=5)}",
+			company="_Test Company",
+			account_type="Receivable",
+		)
+		retention_payable = create_account(
+			parent_account="Accounts Payable - _TC",
+			account_name=f"Retention Payable {frappe.generate_hash(length=5)}",
+			company="_Test Company",
+			account_type="Payable",
+		)
+		frappe.db.set_value(
+			"Company", "_Test Company", "default_retention_receivable_account", retention_receivable
+		)
+		frappe.db.set_value(
+			"Company", "_Test Company", "default_retention_payable_account", retention_payable
+		)
+
+		project = make_project(
+			{"project_name": f"Project Bulk Release {frappe.generate_hash(length=5)}"}
+		)
+		project.enable_retention = 1
+		project.retention_percentage = 10
+		project.save()
+
+		sales_invoice = create_sales_invoice(rate=1000, do_not_submit=True)
+		sales_invoice.project = project.name
+		sales_invoice.save()
+		sales_invoice.submit()
+
+		purchase_invoice = make_purchase_invoice(qty=1, rate=500, do_not_save=True)
+		purchase_invoice.project = project.name
+		purchase_invoice.save()
+		purchase_invoice.submit()
+
+		result = bulk_release_retention(
+			project=project.name,
+			invoice_type="Both",
+			posting_date=nowdate(),
+		)
+
+		self.assertEqual(result.count, 2)
+		self.assertEqual(result.total_released, 150)
+
+		sales_invoice.load_from_db()
+		purchase_invoice.load_from_db()
+		self.assertEqual(sales_invoice.retention_outstanding_amount, 0)
+		self.assertEqual(purchase_invoice.retention_outstanding_amount, 0)
+
+		project.reload()
+		self.assertEqual(project.sales_retention_released_amount, 100)
+		self.assertEqual(project.sales_retention_outstanding_amount, 0)
+		self.assertEqual(project.purchase_retention_released_amount, 50)
+		self.assertEqual(project.purchase_retention_outstanding_amount, 0)
+
 	def test_project_with_template_having_no_parent_and_depend_tasks(self):
 		project_name = "Test Project with Template - No Parent and Dependend Tasks"
 		frappe.db.sql(""" delete from tabTask where project = %s """, project_name)
