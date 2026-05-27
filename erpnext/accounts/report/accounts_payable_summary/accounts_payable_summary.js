@@ -114,6 +114,11 @@ frappe.query_reports["Accounts Payable Summary"] = {
 			fieldtype: "Check",
 		},
 		{
+			fieldname: "show_retention",
+			label: __("Show Retention"),
+			fieldtype: "Check",
+		},
+		{
 			fieldname: "show_gl_balance",
 			label: __("Show GL Balance"),
 			fieldtype: "Check",

@@ -114,6 +114,15 @@ class AccountsReceivableSummary(ReceivablePayableReport):
 			"sales_person": [],
 			"party_type": row.party_type,
 		}
+		if self.filters.get("show_retention"):
+			default_dict.update(
+				{
+					"retention_amount": 0.0,
+					"retention_released_amount": 0.0,
+					"retention_outstanding_amount": 0.0,
+					"amount_due_now": 0.0,
+				}
+			)
 		for i in self.range_numbers:
 			range_key = f"range{i}"
 			default_dict[range_key] = 0.0
@@ -167,6 +176,11 @@ class AccountsReceivableSummary(ReceivablePayableReport):
 		self.add_column(_("Paid Amount"), fieldname="paid")
 		self.add_column(_(credit_debit_label), fieldname="credit_note")
 		self.add_column(_("Outstanding Amount"), fieldname="outstanding")
+		if self.filters.get("show_retention"):
+			self.add_column(_("Retention Amount"), fieldname="retention_amount")
+			self.add_column(_("Retention Released"), fieldname="retention_released_amount")
+			self.add_column(_("Retention Outstanding"), fieldname="retention_outstanding_amount")
+			self.add_column(_("Amount Due Now"), fieldname="amount_due_now")
 
 		if self.filters.show_gl_balance:
 			self.add_column(_("GL Balance"), fieldname="gl_balance")
