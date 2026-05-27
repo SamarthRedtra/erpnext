@@ -74,6 +74,7 @@ class ProcessStatementOfAccounts(Document):
 		sales_person: DF.Link | None
 		sender: DF.Link | None
 		show_future_payments: DF.Check
+		show_post_dated_cheques: DF.Check
 		show_net_values_in_party_account: DF.Check
 		show_remarks: DF.Check
 		start_date: DF.Date | None
@@ -273,6 +274,7 @@ def get_gl_filters(doc, entry, tax_id, presentation_currency):
 		"include_default_book_entries": 0,
 		"tax_id": tax_id if tax_id else None,
 		"show_net_values_in_party_account": doc.show_net_values_in_party_account,
+		"show_post_dated_cheques": doc.show_post_dated_cheques,
 	}
 
 

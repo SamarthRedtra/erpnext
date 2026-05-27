@@ -15,6 +15,7 @@ from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 from erpnext.accounts.report.financial_statements import get_cost_centers_with_children
 from erpnext.accounts.report.utils import convert_to_presentation_currency, get_currency
 from erpnext.accounts.utils import get_account_currency
+from erpnext.pdc.doctype.post_dated_cheques.post_dated_cheques import get_pdc_gl_entries
 
 DEBIT_CREDIT_DICT = {
 	"debit": 0.0,
@@ -149,6 +150,9 @@ def get_result(filters, account_details):
 		accounting_dimensions = get_accounting_dimensions()
 
 	gl_entries = get_gl_entries(filters, accounting_dimensions)
+	if filters.get("show_post_dated_cheques"):
+		gl_entries.extend(get_pdc_gl_entries(filters))
+		gl_entries = sorted(gl_entries, key=lambda d: (d.get("posting_date"), d.get("creation")))
 
 	data = get_data_with_opening_closing(filters, account_details, accounting_dimensions, gl_entries)
 
@@ -754,6 +758,17 @@ def get_columns(filters):
 				"options": "Currency",
 				"width": 70,
 			},
+		]
+
+	if filters.get("show_post_dated_cheques"):
+		columns += [
+			{
+				"label": _("PDC Amount"),
+				"fieldname": "pdc_amount",
+				"fieldtype": "Currency",
+				"options": "presentation_currency",
+				"width": 130,
+			}
 		]
 
 	columns += [

@@ -27,6 +27,7 @@
   "sales_partner",
   "sales_person",
   "show_remarks",
+  "show_post_dated_cheques",
   "based_on_payment_terms",
   "show_future_payments",
   "section_break_3",
@@ -393,6 +394,13 @@
    "fieldname": "show_remarks",
    "fieldtype": "Check",
    "label": "Show Remarks"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:(doc.report == 'General Ledger');",
+   "fieldname": "show_post_dated_cheques",
+   "fieldtype": "Check",
+   "label": "Show Post Dated Cheques"
   },
   {
    "default": "Categorize by Voucher (Consolidated)",

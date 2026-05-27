@@ -57,6 +57,9 @@
 					{% if row.bill_no %}
 						{{ _("Supplier Invoice No") }}: {{ row.bill_no }}
 					{% endif %}
+					{% if row.pdc_amount %}
+						<br>{{ _("PDC Amount") }}: {{ frappe.utils.fmt_money(row.pdc_amount, currency=filters.presentation_currency) }}
+					{% endif %}
 					</td>
 					<td style="text-align: right">
 						{{ frappe.utils.fmt_money(row.debit, currency=filters.presentation_currency) }}</td>

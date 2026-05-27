@@ -1,0 +1,9 @@
+# Copyright (c) 2026, ERPNext contributors
+# For license information, please see license.txt
+
+from frappe.model.document import Document
+
+
+class PostDatedChequesTool(Document):
+	pass
+
