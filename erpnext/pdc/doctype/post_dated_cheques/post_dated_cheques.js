@@ -93,50 +93,69 @@ frappe.ui.form.on("Post Dated Cheques", {
 		}
 
 		if (frm.doc.docstatus === 1 && frm.doc.status === "Pending") {
-			frm.add_custom_button(__("Convert Cheque"), () => {
+			frm.add_custom_button(__("Present"), () => {
+				frappe.call({
+					method: "erpnext.pdc.doctype.post_dated_cheques.post_dated_cheques.present_post_dated_cheque",
+					args: { pdc: frm.doc.name },
+					callback: () => frm.reload_doc()
+				});
+			}, __("PDC Actions"));
+		}
+
+		if (frm.doc.docstatus === 1 && ["Pending", "Presented"].includes(frm.doc.status)) {
+			frm.add_custom_button(__("Clear"), () => {
 				frappe.prompt([
 					{
-						label: __("Execution Date"),
-						fieldname: "execution_date",
+						label: __("Clearance Date"),
+						fieldname: "clearance_date",
 						fieldtype: "Date",
 						default: frm.doc.reference_date,
 						reqd: 1
 					}
 				], (values) => {
 					frappe.call({
-						method: "erpnext.pdc.doctype.post_dated_cheques.post_dated_cheques.convert_post_dated_cheques",
+						method: "erpnext.pdc.doctype.post_dated_cheques.post_dated_cheques.clear_post_dated_cheque",
 						args: {
-							rows: [{
-								pdc: frm.doc.name,
-								bank_account: frm.doc.bank_account,
-								posting_date_override: values.execution_date
-							}],
-							defaults: {
-								company: frm.doc.company
-							}
+							pdc: frm.doc.name,
+							bank_account: frm.doc.bank_account,
+							posting_date: values.clearance_date
 						},
 						callback: function(r) {
-							if (r.message && r.message.created && r.message.created.length) {
-								const pe_name = r.message.created[0].payment_entry;
+							if (r.message && r.message.payment_entry) {
+								const pe_name = r.message.payment_entry;
 								frappe.show_alert({
-									message: __("Converted to Payment Entry: {0}", [
+									message: __("Cleared through Payment Entry: {0}", [
 										`<a href="/app/payment-entry/${pe_name}">${pe_name}</a>`
 									]),
 									indicator: "green"
 								});
 								frm.reload_doc();
 							}
-							if (r.message && r.message.failures && r.message.failures.length) {
-								frappe.msgprint({
-									title: __("Conversion Failed"),
-									message: r.message.failures[0].error,
-									indicator: "red"
-								});
-							}
 						}
 					});
-				}, __("Convert to Payment Entry"), __("Convert"));
-			});
+				}, __("Clear Post Dated Cheque"), __("Clear"));
+			}, __("PDC Actions"));
+			frm.add_custom_button(__("Bounce"), () => {
+				frappe.confirm(__("Mark this cheque as bounced?"), () => {
+					frappe.call({
+						method: "erpnext.pdc.doctype.post_dated_cheques.post_dated_cheques.bounce_post_dated_cheque",
+						args: { pdc: frm.doc.name },
+						callback: () => frm.reload_doc()
+					});
+				});
+			}, __("PDC Actions"));
+		}
+
+		if (frm.doc.docstatus === 1 && frm.doc.status === "Cleared") {
+			frm.add_custom_button(__("Bounce"), () => {
+				frappe.confirm(__("This will cancel the linked Payment Entry and restore invoice outstanding. Continue?"), () => {
+					frappe.call({
+						method: "erpnext.pdc.doctype.post_dated_cheques.post_dated_cheques.bounce_post_dated_cheque",
+						args: { pdc: frm.doc.name },
+						callback: () => frm.reload_doc()
+					});
+				});
+			}, __("PDC Actions"));
 		}
 
 		if (frm.is_new()) return;
@@ -258,7 +277,7 @@ frappe.ui.form.on("Post Dated Cheques", {
 								row.reference_name = d.name;
 								row.total_amount = d.grand_total;
 								row.outstanding_amount = d.outstanding_amount;
-								row.allocated_amount = d.outstanding_amount;
+								row.allocated_amount = d.available_pdc_amount;
 							});
 
 							calculate_total_amount(frm);

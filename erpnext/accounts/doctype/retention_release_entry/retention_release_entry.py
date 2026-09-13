@@ -18,6 +18,7 @@ def get_retention_release_details(
 		frappe.throw(_("Reference Document Type must be Sales Invoice or Purchase Invoice"))
 
 	invoice = frappe.get_doc(reference_doctype, reference_name)
+	invoice.check_permission("read")
 	if invoice.docstatus != 1:
 		frappe.throw(_("Reference invoice must be submitted"))
 	if not invoice.get("enable_retention"):
@@ -81,6 +82,14 @@ class RetentionReleaseEntry(Document):
 		self.validate_reference_invoice()
 
 	def validate_reference_invoice(self):
+		if self.reference_doctype not in ("Sales Invoice", "Purchase Invoice"):
+			frappe.throw(_("Reference Document Type must be Sales Invoice or Purchase Invoice"))
+		if not self.reference_name:
+			frappe.throw(_("Reference Invoice is mandatory"))
+		frappe.db.sql(
+			f"SELECT name FROM `tab{self.reference_doctype}` WHERE name = %s FOR UPDATE",
+			(self.reference_name,),
+		)
 		invoice = frappe.get_doc(self.reference_doctype, self.reference_name)
 		if invoice.docstatus != 1:
 			frappe.throw(_("Reference invoice must be submitted"))
@@ -100,6 +109,14 @@ class RetentionReleaseEntry(Document):
 		self.update_invoice_retention_amounts()
 
 	def on_cancel(self):
+		self.ignore_linked_doctypes = (
+			"GL Entry",
+			"Payment Ledger Entry",
+			"Repost Payment Ledger",
+			"Repost Payment Ledger Items",
+			"Repost Accounting Ledger",
+			"Repost Accounting Ledger Items",
+		)
 		make_reverse_gl_entries(voucher_type=self.doctype, voucher_no=self.name)
 		self.update_invoice_retention_amounts(cancel=True)
 		update_voucher_outstanding(

@@ -1,5 +1,5 @@
 // Copyright (c) 2026, ERPNext contributors
-// List indicator uses custom `status` (Pending / Converted / Cancelled) instead of Draft / Submitted.
+// List indicator uses the cheque lifecycle status instead of Draft / Submitted.
 
 frappe.listview_settings["Post Dated Cheques"] = {
 	add_fields: ["status", "invoice_links", "invoice_links_list", "party_type", "payment_type"],
@@ -43,7 +43,13 @@ frappe.listview_settings["Post Dated Cheques"] = {
 		if (!s) {
 			return [__("—"), "gray", "name,!=,"];
 		}
-		const color = { Pending: "orange", Converted: "green", Cancelled: "grey" }[s] || "gray";
+		const color = {
+			Pending: "orange",
+			Presented: "blue",
+			Cleared: "green",
+			Bounced: "red",
+			Cancelled: "grey"
+		}[s] || "gray";
 		return [__(s), color, "status,=," + s];
 	},
 };

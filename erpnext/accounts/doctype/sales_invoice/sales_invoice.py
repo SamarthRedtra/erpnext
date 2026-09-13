@@ -14,8 +14,8 @@ from frappe.utils import add_days, cint, cstr, flt, formatdate, get_link_to_form
 from frappe.utils.data import comma_and
 
 import erpnext
-from erpnext.accounts.deferred_revenue import validate_service_stop_date
 from erpnext.accounts.advance_recovery import validate_advance_recovery
+from erpnext.accounts.deferred_revenue import validate_service_stop_date
 from erpnext.accounts.doctype.loyalty_program.loyalty_program import (
 	get_loyalty_program_details_with_points,
 	validate_loyalty_points,
@@ -1571,7 +1571,7 @@ class SalesInvoice(SellingController):
 			elif self.docstatus == 2:
 				make_reverse_gl_entries(voucher_type=self.doctype, voucher_no=self.name)
 
-			if update_outstanding == "No":
+			if update_outstanding == "No" or self.get("enable_retention"):
 				update_voucher_outstanding(
 					voucher_type=self.doctype,
 					voucher_no=self.return_against
@@ -2130,7 +2130,7 @@ class SalesInvoice(SellingController):
 					where dn_detail=%s and docstatus=1""",
 					d.dn_detail,
 				)
-				billed_amt = billed_amt and billed_amt[0][0] or 0
+				billed_amt = (billed_amt and billed_amt[0][0]) or 0
 				frappe.db.set_value(
 					"Delivery Note Item",
 					d.dn_detail,
